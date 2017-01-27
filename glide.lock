@@ -1,5 +1,5 @@
 hash: 1a37bf7023f447814179052809e53b7f9af4dddda42ad7aa03ff58b5960d5def
-updated: 2017-01-26T17:12:00.282634707-05:00
+updated: 2017-01-31T15:22:23.753550648-05:00
 imports:
 - name: cloud.google.com/go
   version: 3b1ae45394a234c385be014e9a488f2bb6eef821
@@ -60,6 +60,10 @@ imports:
   subpackages:
   - digest
   - reference
+- name: github.com/docker/docker
+  version: 229625cd47bcdcdf420cee93d30005b4818590ca
+  subpackages:
+  - pkg/mount
 - name: github.com/emicklei/go-restful
   version: 89ef8af493ab468a45a42bb0d89a06fccdd2fb22
   subpackages:
@@ -138,6 +142,10 @@ imports:
   - internal
   - jws
   - jwt
+- name: golang.org/x/sys
+  version: 8f0908ab3b2457e2e15403d3697c9ef5cb4b57a9
+  subpackages:
+  - unix
 - name: golang.org/x/text
   version: 2910a502d2bf9e43193af9d68ca516529614eed3
   subpackages:

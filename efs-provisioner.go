@@ -2,13 +2,16 @@ package main
 
 import (
 	"flag"
+	"fmt"
 	"os"
 	"path"
+	"strings"
 	"time"
 
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/aws/session"
 	"github.com/aws/aws-sdk-go/service/efs"
+	"github.com/docker/docker/pkg/mount"
 	"github.com/golang/glog"
 	"github.com/kubernetes-incubator/nfs-provisioner/controller"
 	"k8s.io/client-go/kubernetes"
@@ -18,22 +21,22 @@ import (
 )
 
 const (
-	pvDir           = "/persistentvolumes"
 	fileSystemIdKey = "FILE_SYSTEM_ID"
 	awsRegionKey    = "AWS_REGION"
 
 	resyncPeriod              = 15 * time.Second
-	provisionerName           = "kubernetes.io/aws-efs"
+	provisionerName           = "foobar.io/aws-efs"
 	exponentialBackOffOnError = true
 	failedRetryThreshold      = 5
 )
 
 type efsProvisioner struct {
-	// The "root" directory on the file system in which to create dirs for each PV
-	pvDir      string
+	// The "" directory on the file system in which to create dirs for each PV
+	// fs-042be7ad.efs.us-west-2.amazonaws.com://persistentvolumes on /persistentvolumes
+	dnsName    string
+	mountpoint string
+	source     string
 	svc        *efs.EFS
-	fileSystem *efs.FileSystemDescription
-	awsRegion  string
 }
 
 func NewEFSProvisioner() controller.Provisioner {
@@ -47,6 +50,13 @@ func NewEFSProvisioner() controller.Provisioner {
 		glog.Fatal("environment variable %s is not set! Please set it.", awsRegionKey)
 	}
 
+	dnsName := getDNSName(fileSystemId, awsRegion)
+
+	mountpoint, source, err := getMount(dnsName)
+	if err != nil {
+		glog.Fatal(err)
+	}
+
 	sess, err := session.NewSession()
 	if err != nil {
 		glog.Fatal(err)
@@ -58,25 +68,43 @@ func NewEFSProvisioner() controller.Provisioner {
 		FileSystemId: aws.String(fileSystemId),
 	}
 
-	resp, err := svc.DescribeFileSystems(params)
+	_, err = svc.DescribeFileSystems(params)
 	if err != nil {
 		glog.Fatal(err)
 	}
 
 	return &efsProvisioner{
-		pvDir:      pvDir,
+		dnsName:    dnsName,
+		mountpoint: mountpoint,
+		source:     source,
 		svc:        svc,
-		fileSystem: resp.FileSystems[0],
-		awsRegion:  awsRegion,
 	}
+}
+
+func getDNSName(fileSystemId, awsRegion string) string {
+	return fileSystemId + ".efs." + awsRegion + ".amazonaws.com"
+}
+
+func getMount(dnsName string) (string, string, error) {
+	entries, err := mount.GetMounts()
+	if err != nil {
+		return "", "", err
+	}
+	for _, e := range entries {
+		glog.Errorf("entry %v\n", e)
+		if strings.HasPrefix(e.Source, dnsName) {
+			return e.Mountpoint, e.Source, nil
+		}
+	}
+
+	return "", "", fmt.Errorf("No mount entry found for %s", dnsName)
 }
 
 var _ controller.Provisioner = &efsProvisioner{}
 
 // Provision creates a storage asset and returns a PV object representing it.
 func (p *efsProvisioner) Provision(options controller.VolumeOptions) (*v1.PersistentVolume, error) {
-	path, err := p.createDirectory(options)
-	if err != nil {
+	if err := os.MkdirAll(p.getLocalPath(options), 0755); err != nil {
 		return nil, err
 	}
 
@@ -92,8 +120,8 @@ func (p *efsProvisioner) Provision(options controller.VolumeOptions) (*v1.Persis
 			},
 			PersistentVolumeSource: v1.PersistentVolumeSource{
 				NFS: &v1.NFSVolumeSource{
-					Server:   p.getMountTarget(),
-					Path:     path,
+					Server:   p.dnsName,
+					Path:     p.getRemotePath(options),
 					ReadOnly: false,
 				},
 			},
@@ -103,17 +131,17 @@ func (p *efsProvisioner) Provision(options controller.VolumeOptions) (*v1.Persis
 	return pv, nil
 }
 
-func (p *efsProvisioner) createDirectory(options controller.VolumeOptions) (string, error) {
-	path := path.Join(p.pvDir, options.PVC.Name+"-"+options.PVName)
-	if err := os.MkdirAll(path, 0755); err != nil {
-		return "", err
-	}
-
-	return path, nil
+func (p *efsProvisioner) getLocalPath(options controller.VolumeOptions) string {
+	return path.Join(p.mountpoint, p.getDirectoryName(options))
 }
 
-func (p *efsProvisioner) getMountTarget() string {
-	return *p.fileSystem.FileSystemId + ".efs." + p.awsRegion + ".amazonaws.com"
+func (p *efsProvisioner) getRemotePath(options controller.VolumeOptions) string {
+	sourcePath := path.Clean(strings.Replace(p.source, p.dnsName+":", "", 1))
+	return path.Join(sourcePath, p.getDirectoryName(options))
+}
+
+func (p *efsProvisioner) getDirectoryName(options controller.VolumeOptions) string {
+	return options.PVC.Name + "-" + options.PVName
 }
 
 // Delete removes the storage asset that was created by Provision represented

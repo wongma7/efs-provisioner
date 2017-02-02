@@ -5,8 +5,8 @@ build:
 		--rm  \
 		-e "CGO_ENABLED=0" \
 		-u $$(id -u):$$(id -g) \
-		-v "$$(pwd):/go/src/efs-provisioner" \
-		-w /go/src/efs-provisioner \
+		-v "$$(pwd):/go/src/github.com/wongma7/efs-provisioner" \
+		-w /go/src/github.com/wongma7/efs-provisioner \
 		golang:1.7.4-alpine \
 		go build -a -installsuffix cgo
 

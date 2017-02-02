@@ -4,7 +4,9 @@ import (
 	"flag"
 	"fmt"
 	"os"
+	"os/exec"
 	"path"
+	"strconv"
 	"strings"
 	"time"
 
@@ -14,6 +16,8 @@ import (
 	"github.com/docker/docker/pkg/mount"
 	"github.com/golang/glog"
 	"github.com/kubernetes-incubator/nfs-provisioner/controller"
+	"github.com/wongma7/efs-provisioner/gidallocator"
+	"github.com/wongma7/efs-provisioner/util"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/pkg/api/v1"
 	"k8s.io/client-go/pkg/util/wait"
@@ -31,15 +35,14 @@ const (
 )
 
 type efsProvisioner struct {
-	// The "" directory on the file system in which to create dirs for each PV
-	// fs-042be7ad.efs.us-west-2.amazonaws.com://persistentvolumes on /persistentvolumes
 	dnsName    string
 	mountpoint string
 	source     string
 	svc        *efs.EFS
+	allocator  gidallocator.Allocator
 }
 
-func NewEFSProvisioner() controller.Provisioner {
+func NewEFSProvisioner(client kubernetes.Interface) controller.Provisioner {
 	fileSystemId := os.Getenv(fileSystemIdKey)
 	if fileSystemId == "" {
 		glog.Fatal("environment variable %s is not set! Please set it.", fileSystemIdKey)
@@ -63,7 +66,6 @@ func NewEFSProvisioner() controller.Provisioner {
 	}
 
 	svc := efs.New(sess, &aws.Config{Region: aws.String(awsRegion)})
-
 	params := &efs.DescribeFileSystemsInput{
 		FileSystemId: aws.String(fileSystemId),
 	}
@@ -78,6 +80,7 @@ func NewEFSProvisioner() controller.Provisioner {
 		mountpoint: mountpoint,
 		source:     source,
 		svc:        svc,
+		allocator:  gidallocator.New(client),
 	}
 }
 
@@ -104,13 +107,26 @@ var _ controller.Provisioner = &efsProvisioner{}
 
 // Provision creates a storage asset and returns a PV object representing it.
 func (p *efsProvisioner) Provision(options controller.VolumeOptions) (*v1.PersistentVolume, error) {
-	if err := os.MkdirAll(p.getLocalPath(options), 0755); err != nil {
+	if options.PVC.Spec.Selector != nil {
+		return nil, fmt.Errorf("claim.Spec.Selector is not supported")
+	}
+
+	gid, err := p.allocator.AllocateNext(options)
+	if err != nil {
+		return nil, err
+	}
+
+	err = p.createVolume(p.getLocalPath(options), gid)
+	if err != nil {
 		return nil, err
 	}
 
 	pv := &v1.PersistentVolume{
 		ObjectMeta: v1.ObjectMeta{
 			Name: options.PVName,
+			Annotations: map[string]string{
+				util.VolumeGidAnnotationKey: strconv.FormatInt(int64(gid), 10),
+			},
 		},
 		Spec: v1.PersistentVolumeSpec{
 			PersistentVolumeReclaimPolicy: options.PersistentVolumeReclaimPolicy,
@@ -131,6 +147,31 @@ func (p *efsProvisioner) Provision(options controller.VolumeOptions) (*v1.Persis
 	return pv, nil
 }
 
+func (p *efsProvisioner) createVolume(path string, gid int) error {
+	perm := os.FileMode(0071)
+
+	if err := os.MkdirAll(path, perm); err != nil {
+		return err
+	}
+
+	// Due to umask, need to chmod
+	cmd := exec.Command("chmod", strconv.FormatInt(int64(perm), 8), path)
+	out, err := cmd.CombinedOutput()
+	if err != nil {
+		os.RemoveAll(path)
+		return fmt.Errorf("chmod failed with error: %v, output: %s", err, out)
+	}
+
+	cmd = exec.Command("chgrp", strconv.Itoa(gid), path)
+	out, err = cmd.CombinedOutput()
+	if err != nil {
+		os.RemoveAll(path)
+		return fmt.Errorf("chgrp failed with error: %v, output: %s", err, out)
+	}
+
+	return nil
+}
+
 func (p *efsProvisioner) getLocalPath(options controller.VolumeOptions) string {
 	return path.Join(p.mountpoint, p.getDirectoryName(options))
 }
@@ -147,7 +188,13 @@ func (p *efsProvisioner) getDirectoryName(options controller.VolumeOptions) stri
 // Delete removes the storage asset that was created by Provision represented
 // by the given PV.
 func (p *efsProvisioner) Delete(volume *v1.PersistentVolume) error {
+	err := p.allocator.Release(volume)
+	if err != nil {
+		return err
+	}
+
 	path := volume.Spec.NFS.Path
+	// TODO this is the remote path *NOT* the local path.
 	if err := os.RemoveAll(path); err != nil {
 		return err
 	}
@@ -179,7 +226,7 @@ func main() {
 
 	// Create the provisioner: it implements the Provisioner interface expected by
 	// the controller
-	efsProvisioner := NewEFSProvisioner()
+	efsProvisioner := NewEFSProvisioner(clientset)
 
 	// Start the provision controller which will dynamically provision efs NFS
 	// PVs

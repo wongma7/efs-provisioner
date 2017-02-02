@@ -152,7 +152,7 @@ func (a *Allocator) getGidTable(className string, min int, max int) (*allocator.
 func (a *Allocator) collectGids(className string, gidTable *allocator.MinMaxAllocator) error {
 	pvList, err := a.client.Core().PersistentVolumes().List(v1.ListOptions{})
 	if err != nil {
-		glog.Errorf("glusterfs: failed to get existing persistent volumes")
+		glog.Errorf("failed to get existing persistent volumes")
 		return err
 	}
 
@@ -166,7 +166,7 @@ func (a *Allocator) collectGids(className string, gidTable *allocator.MinMaxAllo
 		gidStr, ok := pv.Annotations[util.VolumeGidAnnotationKey]
 
 		if !ok {
-			glog.Warningf("glusterfs: no gid found in pv '%v'", pvName)
+			glog.Warningf("no gid found in pv '%v'", pvName)
 			continue
 		}
 
@@ -178,9 +178,9 @@ func (a *Allocator) collectGids(className string, gidTable *allocator.MinMaxAllo
 
 		_, err = gidTable.Allocate(gid)
 		if err == allocator.ErrConflict {
-			glog.Warningf("glusterfs: gid %v found in pv %v was already allocated", gid)
+			glog.Warningf("gid %v found in pv %v was already allocated", gid)
 		} else if err != nil {
-			glog.Errorf("glusterfs: failed to store gid %v found in pv '%v': %v", gid, pvName, err)
+			glog.Errorf("failed to store gid %v found in pv '%v': %v", gid, pvName, err)
 			return err
 		}
 	}
@@ -197,32 +197,32 @@ func parseClassParameters(params map[string]string) (int, int, error) {
 		case "gidmin":
 			parseGidMin, err := convertGid(v)
 			if err != nil {
-				return 0, 0, fmt.Errorf("glusterfs: invalid value %q for volume plugin %s", k, "")
+				return 0, 0, fmt.Errorf("invalid value %s for parameter %s: %v", v, k, err)
 			}
 			if parseGidMin < absoluteGidMin {
-				return 0, 0, fmt.Errorf("glusterfs: gidMin must be >= %v", absoluteGidMin)
+				return 0, 0, fmt.Errorf("gidmin must be >= %v", absoluteGidMin)
 			}
 			if parseGidMin > absoluteGidMax {
-				return 0, 0, fmt.Errorf("glusterfs: gidMin must be <= %v", absoluteGidMax)
+				return 0, 0, fmt.Errorf("gidmin must be <= %v", absoluteGidMax)
 			}
 			gidMin = parseGidMin
 		case "gidmax":
 			parseGidMax, err := convertGid(v)
 			if err != nil {
-				return 0, 0, fmt.Errorf("glusterfs: invalid value %q for volume plugin %s", k, "")
+				return 0, 0, fmt.Errorf("invalid value %s for parameter %s: %v", v, k, err)
 			}
 			if parseGidMax < absoluteGidMin {
-				return 0, 0, fmt.Errorf("glusterfs: gidMax must be >= %v", absoluteGidMin)
+				return 0, 0, fmt.Errorf("gidmax must be >= %v", absoluteGidMin)
 			}
 			if parseGidMax > absoluteGidMax {
-				return 0, 0, fmt.Errorf("glusterfs: gidMax must be <= %v", absoluteGidMax)
+				return 0, 0, fmt.Errorf("gidmax must be <= %v", absoluteGidMax)
 			}
 			gidMax = parseGidMax
 		}
 	}
 
 	if gidMin > gidMax {
-		return 0, 0, fmt.Errorf("StorageClass for provisioner %q must have gidMax value >= gidMin", "")
+		return 0, 0, fmt.Errorf("gidmax %v is not >= gidmin %v", gidMax, gidMin)
 	}
 
 	return gidMin, gidMax, nil
@@ -243,11 +243,11 @@ func getGid(volume *v1.PersistentVolume) (int, bool, error) {
 func convertGid(gidString string) (int, error) {
 	gid64, err := strconv.ParseInt(gidString, 10, 32)
 	if err != nil {
-		return 0, fmt.Errorf("glusterfs: failed to parse gid %v ", gidString)
+		return 0, fmt.Errorf("failed to parse gid %v ", gidString)
 	}
 
 	if gid64 < 0 {
-		return 0, fmt.Errorf("glusterfs: negative GIDs are not allowed: %v", gidString)
+		return 0, fmt.Errorf("negative GIDs are not allowed: %v", gidString)
 	}
 
 	// ParseInt returns a int64, but since we parsed only

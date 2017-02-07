@@ -28,12 +28,15 @@ build:
 		-v $$(pwd)/.go/stdlib:/usr/local/go/pkg/linux_amd64_asdf \
 		-w /go/src/github.com/wongma7/efs-provisioner \
 		golang:1.7.4-alpine \
-		go install -v -installsuffix "asdf" ./cmd/efs-provisioner
+		go install -installsuffix "asdf" ./cmd/efs-provisioner
 
 container: build quick-container
 
 quick-container:
 	docker build -t docker.io/wongma7/efs-provisioner:latest .
+
+test:
+	go test `go list ./... | grep -v 'vendor'`
 
 clean:
 	rm -rf .go

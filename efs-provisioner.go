@@ -94,7 +94,6 @@ func getMount(dnsName string) (string, string, error) {
 		return "", "", err
 	}
 	for _, e := range entries {
-		glog.Errorf("entry %v\n", e)
 		if strings.HasPrefix(e.Source, dnsName) {
 			return e.Mountpoint, e.Source, nil
 		}
@@ -188,18 +187,37 @@ func (p *efsProvisioner) getDirectoryName(options controller.VolumeOptions) stri
 // Delete removes the storage asset that was created by Provision represented
 // by the given PV.
 func (p *efsProvisioner) Delete(volume *v1.PersistentVolume) error {
+	//TODO ignorederror
 	err := p.allocator.Release(volume)
 	if err != nil {
 		return err
 	}
 
-	path := volume.Spec.NFS.Path
-	// TODO this is the remote path *NOT* the local path.
+	path, err := p.getLocalPathToDelete(volume.Spec.NFS)
+	if err != nil {
+		return err
+	}
+
 	if err := os.RemoveAll(path); err != nil {
 		return err
 	}
 
 	return nil
+}
+
+func (p *efsProvisioner) getLocalPathToDelete(nfs *v1.NFSVolumeSource) (string, error) {
+	if nfs.Server != p.dnsName {
+		return "", fmt.Errorf("volume's NFS server %s is not equal to the server %s from which this provisioner creates volumes", nfs.Server, p.dnsName)
+	}
+
+	sourcePath := path.Clean(strings.Replace(p.source, p.dnsName+":", "", 1))
+	if !strings.HasPrefix(nfs.Path, sourcePath) {
+		return "", fmt.Errorf("volume's NFS path %s is not a child of the server path %s mounted in this provisioner at %s", nfs.Path, p.source, p.mountpoint)
+	}
+
+	subpath := strings.Replace(nfs.Path, sourcePath, "", 1)
+
+	return path.Join(p.mountpoint, subpath), nil
 }
 
 func main() {

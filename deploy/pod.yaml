@@ -6,8 +6,9 @@ spec:
   containers:
     - name: efs-provisioner
       image: docker.io/wongma7/efs-provisioner:latest
-      imagePullPolicy: "IfNotPresent"
       env:
+        - name: PROVISIONER_NAME
+          value: "foobar.io/aws-efs"
         - name: AWS_ACCESS_KEY_ID
           valueFrom:
             secretKeyRef:

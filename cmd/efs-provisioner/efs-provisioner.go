@@ -41,11 +41,11 @@ import (
 )
 
 const (
-	fileSystemIdKey = "FILE_SYSTEM_ID"
-	awsRegionKey    = "AWS_REGION"
+	provisionerNameKey = "PROVISIONER_NAME"
+	fileSystemIdKey    = "FILE_SYSTEM_ID"
+	awsRegionKey       = "AWS_REGION"
 
 	resyncPeriod              = 15 * time.Second
-	provisionerName           = "foobar.io/aws-efs"
 	exponentialBackOffOnError = true
 	failedRetryThreshold      = 5
 )
@@ -261,6 +261,11 @@ func main() {
 	// Create the provisioner: it implements the Provisioner interface expected by
 	// the controller
 	efsProvisioner := NewEFSProvisioner(clientset)
+
+	provisionerName := os.Getenv(provisionerNameKey)
+	if provisionerName == "" {
+		glog.Fatal("environment variable %s is not set! Please set it.", provisionerNameKey)
+	}
 
 	// Start the provision controller which will dynamically provision efs NFS
 	// PVs

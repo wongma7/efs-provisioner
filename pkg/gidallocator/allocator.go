@@ -9,8 +9,8 @@ import (
 
 	"github.com/golang/glog"
 	"github.com/kubernetes-incubator/nfs-provisioner/controller"
-	"github.com/wongma7/efs-provisioner/allocator"
-	"github.com/wongma7/efs-provisioner/util"
+	"github.com/wongma7/efs-provisioner/pkg/allocator"
+	"github.com/wongma7/efs-provisioner/pkg/util"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/pkg/api/v1"
 )

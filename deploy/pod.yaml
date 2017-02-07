@@ -34,5 +34,5 @@ spec:
   volumes:
     - name: pv-volume
       nfs:
-        server: fs-042be7ad.efs.us-west-2.amazonaws.com
+        server: fs-47a2c22e.efs.us-west-2.amazonaws.com
         path: /persistentvolumes

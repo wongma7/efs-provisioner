@@ -15,8 +15,6 @@ spec:
         - name: efs-provisioner
           image: docker.io/wongma7/efs-provisioner:latest
           env:
-            - name: PROVISIONER_NAME
-              value: "foobar.io/aws-efs"
             - name: AWS_ACCESS_KEY_ID
               valueFrom:
                 secretKeyRef:
@@ -37,6 +35,11 @@ spec:
                 configMapKeyRef:
                   name: efs-provisioner
                   key: aws.region
+            - name: PROVISIONER_NAME
+              valueFrom:
+                configMapKeyRef:
+                  name: efs-provisioner
+                  key: provisioner.name
           volumeMounts:
             - name: pv-volume
               mountPath: /persistentvolumes

@@ -50,7 +50,7 @@ parameters:
   gidMax: "50000"
 ```
 
-## Parameters
+### Parameters
 
 * `gidMin` + `gidMax` : The minimum and maximum value of GID range for the storage class. A unique value (GID) in this range ( gidMin-gidMax ) will be used for dynamically provisioned volumes. These are optional values. If not specified, the volume will be provisioned with a value between 2000-2147483647 which are defaults for gidMin and gidMax respectively.
 

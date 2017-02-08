@@ -216,10 +216,10 @@ func parseClassParameters(params map[string]string) (int, int, error) {
 				return 0, 0, fmt.Errorf("invalid value %s for parameter %s: %v", v, k, err)
 			}
 			if parseGidMin < absoluteGidMin {
-				return 0, 0, fmt.Errorf("gidmin must be >= %v", absoluteGidMin)
+				return 0, 0, fmt.Errorf("gidMin must be >= %v", absoluteGidMin)
 			}
 			if parseGidMin > absoluteGidMax {
-				return 0, 0, fmt.Errorf("gidmin must be <= %v", absoluteGidMax)
+				return 0, 0, fmt.Errorf("gidMin must be <= %v", absoluteGidMax)
 			}
 			gidMin = parseGidMin
 		case "gidmax":
@@ -228,17 +228,17 @@ func parseClassParameters(params map[string]string) (int, int, error) {
 				return 0, 0, fmt.Errorf("invalid value %s for parameter %s: %v", v, k, err)
 			}
 			if parseGidMax < absoluteGidMin {
-				return 0, 0, fmt.Errorf("gidmax must be >= %v", absoluteGidMin)
+				return 0, 0, fmt.Errorf("gidMax must be >= %v", absoluteGidMin)
 			}
 			if parseGidMax > absoluteGidMax {
-				return 0, 0, fmt.Errorf("gidmax must be <= %v", absoluteGidMax)
+				return 0, 0, fmt.Errorf("gidMax must be <= %v", absoluteGidMax)
 			}
 			gidMax = parseGidMax
 		}
 	}
 
 	if gidMin > gidMax {
-		return 0, 0, fmt.Errorf("gidmax %v is not >= gidmin %v", gidMax, gidMin)
+		return 0, 0, fmt.Errorf("gidMax %v is not >= gidMin %v", gidMax, gidMin)
 	}
 
 	return gidMin, gidMax, nil

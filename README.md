@@ -59,6 +59,13 @@ clusterrole "efs-provisioner-runner" created
 $ oadm policy add-cluster-role-to-user efs-provisioner-runner system:serviceaccount:default:efs-provisioner created
 $ oc patch deployment efs-provisioner -p '{"spec":{"template":{"spec":{"serviceAccount":"efs-provisioner"}}}}'
 ```
+### SELinux
+If SELinux is enforcing on the node where the provisioner runs, you must enable writing from a pod to a remote NFS server (EFS in this case) on the node by running:
+```console
+$ setsebool -P virt_use_nfs 1
+$ setsebool -P virt_sandbox_use_nfs 1
+```
+https://docs.openshift.org/latest/install_config/persistent_storage/persistent_storage_nfs.html#nfs-selinux
 
 ## Usage
 

@@ -1,6 +1,5 @@
 # efs-provisioner
 
-
 ## Deployment
 
 Create a configmap containing the [**File system ID**](http://docs.aws.amazon.com/efs/latest/ug/gs-step-two-create-efs-resources.html) and Amazon EC2 region of the EFS file system you wish to provision NFS PVs from, plus the name of the provisioner, which administrators will specify in the `provisioner` field of their `StorageClass(es)`, e.g. `provisioner: foobar.io/aws-efs`.
@@ -102,3 +101,4 @@ $ kubectl get pv
 NAME                                       CAPACITY   ACCESSMODES   RECLAIMPOLICY   STATUS    CLAIM         REASON    AGE
 pvc-557b4436-ed73-11e6-84b3-06a700dda5f5   1Mi        RWX           Delete          Bound     default/efs             2s
 ```
+Note: any pod that consumes the claim will be able to read/write to the volume. This is because the volumes are provisioned with a GID (from the default range or according to `gidMin` + `gidMax`) and any pod that mounts the volume via the claim automatically gets the GID as a supplemental group.
